@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0A2540" />
+<title>Swift Investments — Mobile</title>
+<meta name="description" content="Swift Investments — a clean, trustworthy mobile investment portal." />
+
+<!-- =========================================================================
+  SWIFT INVESTMENTS — SINGLE-FILE MOBILE APP PREVIEW
+  -------------------------------------------------------------------------
+  Mobile-first, app-style preview. React + Tailwind + Chart.js via CDN.
+
+  NAVIGATION: hash routes (#/dashboard, #/plans, #/deposit, ...).
+    - Public: landing, login, register.
+    - Authenticated pages render inside <AppShell/> (top bar + bottom tab bar).
+
+  ADD A NEW PAGE:
+    1. Build a component under "PAGE COMPONENTS".
+    2. Register it in ROUTES ("ROUTES MAP").
+    3. Optionally add a tab in BOTTOM_NAV.
+
+  ADD A NEW INVESTMENT PLAN: add an entry to the PLANS array.
+  BACKEND HOOKS: all data is mock (see "API SERVICE"). Swap each method body
+  for a real fetch() call — each names its endpoint.
+========================================================================== -->
+
+<!-- Pinned, reliable CDN builds (development React = readable error messages). -->
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.development.js" crossorigin></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.25.6/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        colors: {
+          navy:   { DEFAULT:'#0A2540', 50:'#eef2f7', 100:'#d6e0ec', 600:'#0f3a63', 700:'#0A2540', 800:'#08203a', 900:'#06182b' },
+          brand:  { DEFAULT:'#1E6FE8', 600:'#1E6FE8', 700:'#1657c0' },
+          profit: { DEFAULT:'#16A34A', soft:'#dcfce7' },
+          loss:   { DEFAULT:'#DC2626', soft:'#fee2e2' },
+          gold:   { DEFAULT:'#F59E0B', soft:'#fef3c7' }
+        },
+        fontFamily: { sans:['Inter','system-ui','Segoe UI','Roboto','sans-serif'] },
+        boxShadow:  { card:'0 1px 3px rgba(10,37,64,.08), 0 1px 2px rgba(10,37,64,.06)', pop:'0 10px 30px rgba(10,37,64,.18)' },
+        keyframes:  {
+          fadeUp:{ '0%':{ opacity:0, transform:'translateY(10px)' }, '100%':{ opacity:1, transform:'translateY(0)' } },
+          pop:{ '0%':{ opacity:0, transform:'scale(.96)' }, '100%':{ opacity:1, transform:'scale(1)' } }
+        },
+        animation:  { fadeUp:'fadeUp .4s ease both', pop:'pop .25s ease both' }
+      }
+    }
+  };
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  html{scroll-behavior:smooth}
+  body{font-family:'Inter',system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+  .skeleton{position:relative;overflow:hidden;background:rgba(10,37,64,.08)}
+  .dark .skeleton{background:rgba(255,255,255,.08)}
+  .skeleton::after{content:'';position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);animation:shimmer 1.4s infinite}
+  @keyframes shimmer{100%{transform:translateX(100%)}}
+  .no-scrollbar::-webkit-scrollbar{display:none}
+  .no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+  .safe-bottom{padding-bottom:env(safe-area-inset-bottom)}
+</style>
+</head>
+<body class="bg-slate-100 dark:bg-navy-900 text-navy-800 dark:text-slate-100 antialiased">
+<div id="root">
+  <div id="boot" style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif;color:#64748b;font-size:14px">Loading Swift Investments…</div>
+</div>
+<noscript><div style="padding:24px;font-family:sans-serif;color:#0A2540">This preview needs JavaScript enabled.</div></noscript>
+<script>
+  // Never show a blank page: surface load/runtime failures to the user.
+  function swiftShowError(msg, detail){
+    var r = document.getElementById('root'); if(!r) return;
+    r.innerHTML = '<div style="max-width:560px;margin:48px auto;font-family:Inter,system-ui,sans-serif;padding:28px;border:1px solid #fee2e2;background:#fff;border-radius:16px;color:#0A2540;box-shadow:0 1px 3px rgba(10,37,64,.08)">'
+      + '<div style="font-size:28px">⚠️</div><h2 style="margin:8px 0 6px;font-size:18px">' + msg + '</h2>'
+      + '<p style="color:#64748b;font-size:13px;line-height:1.5;margin:0">' + (detail||'') + '</p>'
+      + '<p style="color:#94a3b8;font-size:12px;margin-top:12px">This preview loads React, Tailwind and Chart.js from a CDN, so it needs internet access. Reload once you are online.</p></div>';
+  }
+  window.addEventListener('error', function(e){ if(document.getElementById('boot')) swiftShowError('Something failed to load', (e && e.message) || 'Script error'); });
+  setTimeout(function(){
+    if(!document.getElementById('boot')) return;
+    var missing = [];
+    if(!window.React) missing.push('React');
+    if(!window.ReactDOM) missing.push('ReactDOM');
+    if(!window.Babel) missing.push('Babel');
+    if(!window.Chart) missing.push('Chart.js');
+    if(missing.length) swiftShowError('Could not load required libraries', 'Missing: ' + missing.join(', ') + '.');
+  }, 7000);
+</script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, createContext, useContext } = React;
+const ChartJS = window.Chart;
+
+/* ---------- formatting helpers (Ghana Cedi) ---------- */
+const cedi  = (n)=> '₵' + Number(n||0).toLocaleString('en-US',{ minimumFractionDigits:2, maximumFractionDigits:2 });
+const cedi0 = (n)=> '₵' + Number(n||0).toLocaleString('en-US',{ maximumFractionDigits:0 });
+const pct   = (n)=> (n>=0?'+':'') + Number(n).toFixed(1) + '%';
+const cx    = (...a)=> a.filter(Boolean).join(' ');
+
+/* =========================================================================
+   INVESTMENT PLANS   >>> ADD / EDIT A PLAN HERE <<<
+   total = daily * days (return over the validity period)
+========================================================================= */
+const PLANS = [
+  { name:'VIP 1',        price:100,  daily:20,   days:30, tag:'Starter',    accent:'brand'  },
+  { name:'VIP 2',        price:200,  daily:40,   days:30, tag:'Popular',    accent:'brand'  },
+  { name:'VIP 3',        price:500,  daily:250,  days:30, tag:null,         accent:'navy'   },
+  { name:'Mega VIP',     price:1000, daily:500,  days:30, tag:null,         accent:'navy'   },
+  { name:'Super VIP',    price:2000, daily:500,  days:30, tag:null,         accent:'gold'   },
+  { name:'Ultimate VIP', price:5000, daily:1000, days:30, tag:'Best value', accent:'gold'   }
+];
+
+/* Deposit quick amounts grid */
+const DEPOSIT_AMOUNTS = [100, 200, 300, 500, 1000, 2000, 5000];
+
+/* Telecel Cash receiver details (move to backend/config in production) */
+const PAYEE = { number:'0509469973', name:'Rebecca Dadzie', note:'Telecel Cash' };
+
+/* =========================================================================
+   MOCK DATA  — replace with API responses (see API SERVICE)
+========================================================================= */
+const MOCK = {
+  user:{ name:'Emma Highest', phone:'0541234567', tier:'VIP 2', joined:'Mar 2024', avatar:'EH' },
+  balance:3250.00, invested:2000, available:1250.00, todayPL:120.00, totalPL:640.00, totalPLPct:24.5,
+  performance:{ labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], values:[2610,2680,2740,2810,2960,3080,3250] },
+  active:[
+    { name:'VIP 2', daily:40, days:30, dayOf:12 },
+    { name:'VIP 1', daily:20, days:30, dayOf:24 }
+  ],
+  transactions:[
+    { id:'TXN-10241', date:'2026-06-15', type:'Income',     amount:60,   status:'Completed' },
+    { id:'TXN-10238', date:'2026-06-14', type:'Deposit',    amount:500,  status:'Completed' },
+    { id:'TXN-10231', date:'2026-06-12', type:'Investment', amount:200,  status:'Completed' },
+    { id:'TXN-10225', date:'2026-06-10', type:'Withdrawal', amount:300,  status:'Pending'   },
+    { id:'TXN-10219', date:'2026-06-08', type:'Income',     amount:40,   status:'Completed' },
+    { id:'TXN-10204', date:'2026-06-05', type:'Withdrawal', amount:150,  status:'Failed'    }
+  ],
+  notifications:[
+    { id:1, title:'Daily income credited', body:'₵60.00 added from your active plans.', time:'2h', tone:'profit', unread:true },
+    { id:2, title:'Deposit confirmed',     body:'₵500.00 added to your wallet.',        time:'5h', tone:'brand',  unread:true },
+    { id:3, title:'Withdrawal pending',    body:'₵300.00 withdrawal is under review.',   time:'1d', tone:'loss',   unread:false }
+  ]
+};
+
+/* =========================================================================
+   API SERVICE (mock) — swap each body for a real fetch()
+========================================================================= */
+function delay(data, ms){ return new Promise(function(res){ setTimeout(function(){ res(data); }, ms||300); }); }
+
+/* =========================================================================
+   WHERE IS THE BACKEND?  (read this if you deploy)
+   -------------------------------------------------------------------------
+   • Leave BACKEND_URL = '' to (a) use the live database when this file is
+     served by your own backend (http://localhost:4000), or (b) run as a
+     self-contained DEMO with built-in data when hosted on GitHub Pages or
+     opened directly from disk.
+   • Once you host the backend on a free server (e.g. Render), paste its URL
+     here, e.g.  const BACKEND_URL = 'https://swift-api.onrender.com';
+     Then the GitHub Pages site will use your REAL database.
+========================================================================= */
+const BACKEND_URL = ''; // <<< paste your hosted backend URL here to go fully live
+const API_BASE =
+  BACKEND_URL ? (BACKEND_URL.replace(/\/$/, '') + '/api')
+  : ((location.protocol === 'http:' || location.protocol === 'https:') ? '/api' : null);
+
+async function apiGet(path, fallback){
+  if(!API_BASE) return delay(fallback);
+  try{
+    const r = await fetch(API_BASE + path, { credentials:'include' });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  }catch(err){ console.warn('[api] offline — using demo data for', path); return delay(fallback); }
+}
+async function apiPost(path, body, fallback){
+  if(!API_BASE) return delay(fallback);
+  try{
+    const r = await fetch(API_BASE + path, { method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'include', body: JSON.stringify(body||{}) });
+    if(!r.ok){ const e = await r.json().catch(function(){ return {}; }); throw new Error(e.error || ('HTTP ' + r.status)); }
+    return await r.json();
+  }catch(err){ console.warn('[api] offline — using demo response for', path); return delay(fallback); }
+}
+
+const api = {
+  getProfile:       ()=> apiGet('/me', MOCK.user),                               // GET /api/me
+  getSummary:       ()=> apiGet('/portfolio/summary', MOCK),                      // GET /api/portfolio/summary
+  getPerformance:   ()=> apiGet('/portfolio/performance', MOCK.performance),      // GET /api/portfolio/performance
+  getActive:        ()=> apiGet('/plans/active', MOCK.active),                    // GET /api/plans/active
+  getTransactions:  ()=> apiGet('/transactions', MOCK.transactions),             // GET /api/transactions
+  getNotifications: ()=> apiGet('/notifications', MOCK.notifications),           // GET /api/notifications
+  login:            (creds)=> apiPost('/auth/login', creds, { ok:true }),         // POST /api/auth/login
+  register:         (data)=> apiPost('/auth/register', data, { ok:true }),        // POST /api/auth/register
+  subscribePlan:    (plan)=> apiPost('/plans/subscribe', { plan: (plan && plan.name) ? plan.name : plan }, { ok:true, plan:plan }), // POST /api/plans/subscribe
+  deposit:          (amount)=> apiPost('/wallet/deposit', { amount: amount }, { ok:true, amount:amount }), // POST /api/wallet/deposit
+  withdraw:         (payload)=> apiPost('/wallet/withdraw', payload, { ok:true, payload:payload }) // POST /api/wallet/withdraw
+};
+
+/* =========================================================================
+   APP CONTEXT (auth + theme + selected deposit amount) + HASH ROUTER
+========================================================================= */
+const AppCtx = createContext(null);
+const useApp = ()=> useContext(AppCtx);
+function AppProvider({ children }){
+  const [authed,setAuthed] = useState(false);
+  const [dark,setDark]     = useState(false);
+  const [depositAmount,setDepositAmount] = useState(DEPOSIT_AMOUNTS[0]);
+  useEffect(function(){ document.documentElement.classList.toggle('dark', dark); }, [dark]);
+  const ctx = { authed:authed, setAuthed:setAuthed, dark:dark, setDark:setDark, depositAmount:depositAmount, setDepositAmount:setDepositAmount };
+  return <AppCtx.Provider value={ctx}>{children}</AppCtx.Provider>;
+}
+function useHashRoute(){
+  const [route,setRoute] = useState(window.location.hash.replace('#','') || '/');
+  useEffect(function(){
+    const on = ()=>{ setRoute(window.location.hash.replace('#','') || '/'); window.scrollTo(0,0); };
+    window.addEventListener('hashchange', on);
+    return ()=> window.removeEventListener('hashchange', on);
+  }, []);
+  return route;
+}
+const go = (path)=>{ window.location.hash = path; };
+
+/* =========================================================================
+   CUSTOM LOGO
+========================================================================= */
+function Logo({ size=30, withText=true, light=false }){
+  return (
+    <span className="inline-flex items-center gap-2 select-none">
+      <svg width={size} height={size} viewBox="0 0 48 48" fill="none" aria-label="Swift Investments logo">
+        <rect width="48" height="48" rx="12" fill="#0A2540"/>
+        <path d="M13 30 L23 16 L29 24 L35 14" stroke="#16A34A" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M30 14 H35 V19" stroke="#16A34A" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx="23" cy="16" r="2.4" fill="#1E6FE8"/>
+      </svg>
+      {withText && (
+        <span className={cx('font-extrabold tracking-tight text-[1.05rem] leading-none', light?'text-white':'text-navy-700 dark:text-white')}>
+          Swift<span className="text-brand">.</span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+/* =========================================================================
+   REUSABLE UI
+========================================================================= */
+function Button({ children, variant='primary', size='md', className='', ...p }){
+  const base='inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-200 active:scale-[.98] focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-50';
+  const sizes={ sm:'text-sm px-3 py-1.5', md:'px-4 py-2.5', lg:'text-base px-6 py-3.5 w-full' };
+  const variants={
+    primary:'bg-brand text-white hover:bg-brand-700 shadow-sm',
+    success:'bg-profit text-white hover:brightness-95 shadow-sm',
+    danger:'bg-loss text-white hover:brightness-95 shadow-sm',
+    gold:'bg-gold text-navy-900 hover:brightness-95 shadow-sm',
+    ghost:'text-navy-700 dark:text-slate-200 hover:bg-navy-50 dark:hover:bg-white/10',
+    outline:'border border-slate-300 dark:border-white/15 hover:bg-navy-50 dark:hover:bg-white/10'
+  };
+  return <button className={cx(base,sizes[size],variants[variant],className)} {...p}>{children}</button>;
+}
+function Card({ children, className='' }){
+  return <div className={cx('bg-white dark:bg-navy-800 rounded-2xl shadow-card border border-slate-100 dark:border-white/10', className)}>{children}</div>;
+}
+function Badge({ children, tone='slate' }){
+  const tones={
+    slate:'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-200',
+    profit:'bg-profit-soft text-profit dark:bg-profit/15',
+    loss:'bg-loss-soft text-loss dark:bg-loss/15',
+    brand:'bg-blue-50 text-brand dark:bg-brand/15',
+    gold:'bg-gold-soft text-amber-600 dark:bg-gold/15 dark:text-amber-300',
+    amber:'bg-amber-50 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300'
+  };
+  return <span className={cx('inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full', tones[tone])}>{children}</span>;
+}
+function Icon({ d, className='w-5 h-5' }){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg>;
+}
+function Modal({ open, onClose, title, children }){
+  if(!open) return null;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-navy-900/50 backdrop-blur-sm" onClick={onClose}/>
+      <div className="relative bg-white dark:bg-navy-800 w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-pop p-6 animate-pop border border-slate-100 dark:border-white/10">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold">{title}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-loss text-2xl leading-none">&times;</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+function Field({ label, type='text', placeholder, value, onChange, hint }){
+  return (
+    <label className="block">
+      <span className="text-sm font-medium text-navy-700 dark:text-slate-200">{label}</span>
+      <input type={type} placeholder={placeholder} value={value} onChange={onChange}
+        className="mt-1 w-full rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-navy-900 px-3.5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"/>
+      {hint && <span className="text-xs text-slate-400 mt-1 block">{hint}</span>}
+    </label>
+  );
+}
+function TableSkeleton({ rows=5 }){
+  return <div className="space-y-2">{Array.from({length:rows}).map(function(_,i){ return <div key={i} className="h-12 skeleton rounded-xl"/>; })}</div>;
+}
+function ErrorState({ onRetry }){
+  return (
+    <Card className="p-8 text-center">
+      <div className="text-4xl mb-2">⚠️</div>
+      <h3 className="font-bold text-lg">Something went wrong</h3>
+      <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">We couldn't load this data. Please try again.</p>
+      <Button variant="outline" className="mt-4 w-auto px-6" onClick={onRetry}>Retry</Button>
+    </Card>
+  );
+}
+function Toggle({ on, onClick }){
+  const [s,setS]=useState(on);
+  return <button onClick={(e)=>{ setS(!s); if(onClick) onClick(e); }} className={cx('w-11 h-6 rounded-full transition-colors relative shrink-0', s?'bg-profit':'bg-slate-300 dark:bg-white/20')}><span className={cx('absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all', s?'left-[22px]':'left-0.5')}/></button>;
+}
+
+/* Chart.js wrapper */
+function ChartCanvas({ type, data, options, height=200 }){
+  const ref = useRef(null); const inst = useRef(null);
+  useEffect(function(){
+    if(!ref.current) return;
+    inst.current = new ChartJS(ref.current, { type:type, data:data, options:options });
+    return ()=>{ if(inst.current) inst.current.destroy(); };
+  }, [JSON.stringify(data), type]);
+  const box = { height: height + 'px' };
+  return <div style={box}><canvas ref={ref}/></div>;
+}
+function lineData(perf){
+  return { labels:perf.labels, datasets:[{ label:'Balance', data:perf.values, borderColor:'#1E6FE8',
+    borderWidth:3, tension:.4, fill:true, pointRadius:0, pointHoverRadius:5,
+    backgroundColor:function(c){ const g=c.chart.ctx.createLinearGradient(0,0,0,200); g.addColorStop(0,'rgba(30,111,232,.25)'); g.addColorStop(1,'rgba(30,111,232,0)'); return g; } }] };
+}
+function axisOpts(dark){
+  return { responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ display:false }, tooltip:{ backgroundColor:'#0A2540' } },
+    scales:{ x:{ grid:{ display:false }, ticks:{ color: dark?'#94a3b8':'#64748b' } },
+      y:{ grid:{ color: dark?'rgba(255,255,255,.06)':'rgba(10,37,64,.06)' }, ticks:{ color: dark?'#94a3b8':'#64748b' } } } };
+}
+
+/* =========================================================================
+   PLAN CARD + GRID (shown on landing + dashboard + plans page)
+========================================================================= */
+function PlanCard({ plan }){
+  const ring = plan.accent==='gold' ? 'ring-gold/40' : plan.accent==='navy' ? 'ring-navy-200 dark:ring-white/10' : 'ring-brand/30';
+  const head = plan.accent==='gold' ? 'from-amber-400 to-gold' : plan.accent==='navy' ? 'from-navy-700 to-navy-600' : 'from-brand to-brand-700';
+  return (
+    <div className={cx('rounded-2xl bg-white dark:bg-navy-800 shadow-card border border-slate-100 dark:border-white/10 ring-1 overflow-hidden flex flex-col animate-fadeUp', ring)}>
+      <div className={cx('bg-gradient-to-br text-white px-4 pt-3 pb-4', head)}>
+        <div className="flex items-center justify-between">
+          <span className="font-extrabold">{plan.name}</span>
+          {plan.tag && <span className="text-[10px] font-bold uppercase tracking-wide bg-white/20 px-2 py-0.5 rounded-full">{plan.tag}</span>}
+        </div>
+        <p className="text-2xl font-extrabold mt-1">{cedi0(plan.price)}</p>
+      </div>
+      <div className="p-4 flex-1 flex flex-col">
+        <div className="space-y-1.5 text-sm flex-1">
+          <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Daily income</span><span className="font-bold text-profit">{cedi0(plan.daily)}</span></div>
+          <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Valid period</span><span className="font-semibold">{plan.days} days</span></div>
+          <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Total return</span><span className="font-bold text-navy-700 dark:text-white">{cedi0(plan.daily*plan.days)}</span></div>
+        </div>
+        <Button size="sm" variant={plan.accent==='gold'?'gold':'primary'} className="mt-3 w-full" onClick={()=>go('/plans')}>Invest now</Button>
+      </div>
+    </div>
+  );
+}
+function PlansGrid({ plans=PLANS }){
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {plans.map(function(p){ return <PlanCard key={p.name} plan={p}/>; })}
+    </div>
+  );
+}
+
+/* =========================================================================
+   APP SHELL — mobile top bar + bottom tab navigation
+========================================================================= */
+const BOTTOM_NAV = [
+  { path:'/dashboard', label:'Home',     icon:'M3 12l9-9 9 9M5 10v10h14V10' },
+  { path:'/plans',     label:'Plans',    icon:'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z' },
+  { path:'/deposit',   label:'Deposit',  icon:'M12 5v14M5 12h14' },
+  { path:'/withdraw',  label:'Withdraw', icon:'M12 19V5M5 12l7-7 7 7' },
+  { path:'/account',   label:'Account',  icon:'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0' }
+];
+function AppShell({ route, children, title }){
+  const { dark, setDark } = useApp();
+  const [notifOpen,setNotifOpen] = useState(false);
+  const [notifs,setNotifs] = useState([]);
+  useEffect(function(){ api.getNotifications().then(setNotifs); }, []);
+  const unread = notifs.filter(function(n){ return n.unread; }).length;
+  return (
+    <div className="min-h-screen max-w-md mx-auto bg-slate-100 dark:bg-navy-900 flex flex-col relative shadow-xl">
+      <header className="h-14 sticky top-0 z-30 bg-white/85 dark:bg-navy-800/85 backdrop-blur border-b border-slate-100 dark:border-white/10 flex items-center gap-3 px-4">
+        <Logo withText={false}/>
+        <div className="font-bold text-navy-700 dark:text-white">{title || 'Swift'}</div>
+        <div className="ml-auto flex items-center gap-1">
+          <button onClick={()=>setDark(!dark)} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10" title="Theme">
+            {dark ? <Icon d="M12 3v2M12 19v2M5 12H3M21 12h-2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4M12 8a4 4 0 100 8 4 4 0 000-8z"/> : <Icon d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/>}
+          </button>
+          <div className="relative">
+            <button onClick={()=>setNotifOpen(function(o){ return !o; })} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 relative">
+              <Icon d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/>
+              {unread>0 && <span className="absolute top-1 right-1 w-4 h-4 text-[10px] font-bold bg-loss text-white rounded-full flex items-center justify-center">{unread}</span>}
+            </button>
+            {notifOpen && (
+              <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-navy-800 rounded-2xl shadow-pop border border-slate-100 dark:border-white/10 overflow-hidden animate-pop z-40">
+                <div className="px-4 py-3 border-b border-slate-100 dark:border-white/10 font-bold text-sm">Notifications</div>
+                <div className="max-h-80 overflow-auto">
+                  {notifs.map(function(n){
+                    return (
+                      <div key={n.id} className={cx('px-4 py-3 flex gap-3 border-b border-slate-50 dark:border-white/5', n.unread&&'bg-blue-50/50 dark:bg-white/5')}>
+                        <span className={cx('mt-1 w-2 h-2 rounded-full shrink-0', n.tone==='profit'?'bg-profit':n.tone==='loss'?'bg-loss':'bg-brand')}/>
+                        <div><p className="text-sm font-semibold">{n.title}</p><p className="text-xs text-slate-500 dark:text-slate-400">{n.body}</p><p className="text-[11px] text-slate-400 mt-0.5">{n.time} ago</p></div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+      <main className="flex-1 p-4 pb-24">{children}</main>
+      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/90 dark:bg-navy-800/90 backdrop-blur border-t border-slate-100 dark:border-white/10 grid grid-cols-5 safe-bottom z-30">
+        {BOTTOM_NAV.map(function(it){
+          const active = route.startsWith(it.path);
+          const center = it.path==='/deposit';
+          if(center){
+            return (
+              <a key={it.path} href={'#'+it.path} className="flex flex-col items-center justify-end pb-1.5 -mt-4">
+                <span className="w-12 h-12 rounded-full bg-brand text-white grid place-items-center shadow-pop"><Icon d={it.icon} className="w-6 h-6"/></span>
+                <span className={cx('text-[10px] mt-0.5 font-semibold', active?'text-brand':'text-slate-500')}>{it.label}</span>
+              </a>
+            );
+          }
+          return (
+            <a key={it.path} href={'#'+it.path} className={cx('flex flex-col items-center gap-0.5 py-2.5', active?'text-brand':'text-slate-400')}>
+              <Icon d={it.icon} className="w-5 h-5"/>
+              <span className="text-[10px] font-semibold">{it.label}</span>
+            </a>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
+
+/* =========================================================================
+   PAGE COMPONENTS
+========================================================================= */
+
+/* ---------- Landing (public, mobile-first marketing) ---------- */
+function Landing(){
+  const { dark, setDark } = useApp();
+  const features = [
+    ['📊','Live dashboard','Track balance, income and growth in real time.'],
+    ['🛡️','Secure','Bank-grade encryption keeps your money safe.'],
+    ['⚡','Daily income','Earn every day from your active VIP plans.'],
+    ['📱','Mobile-first','A smooth app experience on any phone.']
+  ];
+  return (
+    <div className="max-w-md mx-auto min-h-screen bg-white dark:bg-navy-900 shadow-xl">
+      <header className="h-14 flex items-center px-4 sticky top-0 bg-white/85 dark:bg-navy-900/85 backdrop-blur z-20 border-b border-slate-100 dark:border-white/10">
+        <Logo/>
+        <div className="ml-auto flex items-center gap-2">
+          <button onClick={()=>setDark(!dark)} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10">{dark?'☀️':'🌙'}</button>
+          <Button variant="ghost" size="sm" onClick={()=>go('/login')}>Log in</Button>
+        </div>
+      </header>
+      <section className="px-5 pt-8 pb-6 text-center">
+        <Badge tone="brand">Trusted by 120,000+ investors</Badge>
+        <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-navy-700 dark:text-white leading-tight">Invest smart.<br/>Earn <span className="text-profit">daily.</span></h1>
+        <p className="mt-3 text-slate-600 dark:text-slate-300">Swift Investments gives you a clean, trustworthy way to grow your money with daily income plans.</p>
+        <div className="mt-6 space-y-3">
+          <Button size="lg" onClick={()=>go('/register')}>Create free account</Button>
+          <Button size="lg" variant="outline" onClick={()=>go('/dashboard')}>View live demo</Button>
+        </div>
+      </section>
+      <section className="px-5 py-6 bg-slate-50 dark:bg-navy-800/40">
+        <h2 className="text-lg font-extrabold text-navy-700 dark:text-white">Investment plans</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Pick a VIP plan and start earning daily.</p>
+        <PlansGrid/>
+      </section>
+      <section className="px-5 py-8 grid grid-cols-2 gap-3">
+        {features.map(function(f){
+          return (
+            <Card key={f[1]} className="p-4">
+              <div className="text-2xl">{f[0]}</div>
+              <h3 className="mt-2 font-bold text-navy-700 dark:text-white text-sm">{f[1]}</h3>
+              <p className="mt-1 text-slate-500 dark:text-slate-400 text-xs">{f[2]}</p>
+            </Card>
+          );
+        })}
+      </section>
+      <section className="px-5 pb-10">
+        <Card className="p-6 text-center bg-gradient-to-br from-navy-700 to-brand text-white border-0">
+          <h2 className="text-xl font-extrabold">Start today</h2>
+          <p className="mt-1 text-slate-200 text-sm">Join thousands growing their wealth with Swift.</p>
+          <Button size="lg" variant="success" className="mt-4" onClick={()=>go('/register')}>Get started</Button>
+        </Card>
+        <p className="text-center text-xs text-slate-400 mt-6">© 2026 Swift Investments. Demo only.</p>
+      </section>
+    </div>
+  );
+}
+
+/* ---------- Auth ---------- */
+function AuthLayout({ title, subtitle, children, foot }){
+  return (
+    <div className="max-w-md mx-auto min-h-screen bg-white dark:bg-navy-900 shadow-xl flex flex-col">
+      <div className="bg-navy-700 text-white px-6 pt-12 pb-8 rounded-b-3xl">
+        <Logo light/>
+        <h1 className="text-2xl font-extrabold mt-6">{title}</h1>
+        <p className="text-slate-300 text-sm mt-1">{subtitle}</p>
+      </div>
+      <div className="p-6 flex-1">
+        <div className="space-y-4 animate-fadeUp">{children}</div>
+        <p className="mt-6 text-sm text-center text-slate-500 dark:text-slate-400">{foot}</p>
+      </div>
+    </div>
+  );
+}
+function Login(){
+  const { setAuthed } = useApp(); const [loading,setLoading]=useState(false);
+  const submit=(e)=>{ e.preventDefault(); setLoading(true); api.login().then(()=>{ setAuthed(true); go('/dashboard'); }); };
+  return (
+    <AuthLayout title="Welcome back" subtitle="Log in to access your portfolio." foot={<>New to Swift? <a href="#/register" className="text-brand font-semibold">Create an account</a></>}>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Phone or email" placeholder="0541234567"/>
+        <Field label="Password" type="password" placeholder="••••••••"/>
+        <div className="flex items-center justify-between text-sm">
+          <label className="flex items-center gap-2 text-slate-500"><input type="checkbox" className="rounded"/> Remember me</label>
+          <a href="#" className="text-brand font-medium">Forgot password?</a>
+        </div>
+        <Button size="lg" disabled={loading}>{loading?'Signing in…':'Log in'}</Button>
+      </form>
+    </AuthLayout>
+  );
+}
+function Register(){
+  const { setAuthed } = useApp(); const [loading,setLoading]=useState(false);
+  const submit=(e)=>{ e.preventDefault(); setLoading(true); api.login().then(()=>{ setAuthed(true); go('/dashboard'); }); };
+  return (
+    <AuthLayout title="Create account" subtitle="Start investing in under 2 minutes." foot={<>Already have an account? <a href="#/login" className="text-brand font-semibold">Log in</a></>}>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Full name" placeholder="Emma Highest"/>
+        <Field label="Phone number" placeholder="0541234567"/>
+        <Field label="Password" type="password" placeholder="Create a password"/>
+        <label className="flex items-start gap-2 text-xs text-slate-500"><input type="checkbox" className="mt-0.5 rounded"/> I agree to the Terms of Service and Privacy Policy.</label>
+        <Button size="lg" disabled={loading}>{loading?'Creating…':'Create account'}</Button>
+      </form>
+    </AuthLayout>
+  );
+}
+
+/* ---------- Dashboard (Home) ---------- */
+function Dashboard(){
+  const { dark } = useApp();
+  const [sum,setSum]=useState(null); const [active,setActive]=useState(null); const [txns,setTxns]=useState(null); const [err,setErr]=useState(false);
+  function load(){ setErr(false); setSum(null); setActive(null); setTxns(null);
+    Promise.all([api.getSummary(), api.getActive(), api.getTransactions()])
+      .then(function(r){ setSum(r[0]); setActive(r[1]); setTxns(r[2].slice(0,4)); })
+      .catch(function(){ setErr(true); }); }
+  useEffect(load, []);
+  if(err) return <ErrorState onRetry={load}/>;
+  return (
+    <div className="space-y-5">
+      {/* Balance hero */}
+      <div className="rounded-3xl bg-gradient-to-br from-navy-700 to-brand text-white p-5 shadow-pop animate-fadeUp">
+        <p className="text-sm text-slate-200">Account balance</p>
+        {!sum ? <div className="h-9 w-40 skeleton rounded mt-1 bg-white/20"/> : <p className="text-3xl font-extrabold mt-1">{cedi(sum.balance)}</p>}
+        <div className="flex gap-4 mt-3 text-sm">
+          <div><span className="text-slate-300">Today </span><span className="font-bold text-white">{sum?('+'+cedi0(sum.todayPL)):'…'}</span></div>
+          <div><span className="text-slate-300">Total P/L </span><span className="font-bold text-white">{sum?pct(sum.totalPLPct):'…'}</span></div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <button onClick={()=>go('/deposit')} className="bg-white/15 hover:bg-white/25 rounded-xl py-2.5 text-sm font-semibold flex items-center justify-center gap-2"><Icon d="M12 5v14M5 12h14" className="w-4 h-4"/> Deposit</button>
+          <button onClick={()=>go('/withdraw')} className="bg-white/15 hover:bg-white/25 rounded-xl py-2.5 text-sm font-semibold flex items-center justify-center gap-2"><Icon d="M12 19V5M5 12l7-7 7 7" className="w-4 h-4"/> Withdraw</button>
+        </div>
+      </div>
+      {/* mini stats */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="p-4"><p className="text-xs text-slate-500">Available</p><p className="text-lg font-extrabold text-navy-700 dark:text-white">{sum?cedi0(sum.available):'…'}</p></Card>
+        <Card className="p-4"><p className="text-xs text-slate-500">Invested</p><p className="text-lg font-extrabold text-navy-700 dark:text-white">{sum?cedi0(sum.invested):'…'}</p></Card>
+      </div>
+      {/* performance */}
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-navy-700 dark:text-white">7-day growth</h3><Badge tone="profit">▲ this week</Badge></div>
+        <ChartCanvas type="line" height={170} data={lineData(MOCK.performance)} options={axisOpts(dark)}/>
+      </Card>
+      {/* active plans */}
+      <div>
+        <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-navy-700 dark:text-white">Active investments</h3></div>
+        {!active ? <TableSkeleton rows={2}/> : (
+          <div className="space-y-2">
+            {active.map(function(a){
+              const barStyle = { width: Math.round(a.dayOf/a.days*100) + '%' };
+              return (
+                <Card key={a.name} className="p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand grid place-items-center font-extrabold text-xs">{a.name.replace('VIP','V')}</div>
+                  <div className="flex-1"><p className="font-bold text-sm">{a.name}</p><p className="text-xs text-slate-400">Day {a.dayOf} of {a.days}</p>
+                    <div className="h-1.5 bg-slate-100 dark:bg-white/10 rounded-full mt-1 overflow-hidden"><div className="h-full bg-profit rounded-full" style={barStyle}/></div>
+                  </div>
+                  <div className="text-right"><p className="text-xs text-slate-400">Daily</p><p className="font-bold text-profit">{cedi0(a.daily)}</p></div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      {/* plans grid */}
+      <div>
+        <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-navy-700 dark:text-white">Investment plans</h3><a href="#/plans" className="text-sm text-brand font-semibold">See all →</a></div>
+        <PlansGrid plans={PLANS.slice(0,4)}/>
+      </div>
+      {/* recent txns */}
+      <div>
+        <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-navy-700 dark:text-white">Recent transactions</h3><a href="#/transactions" className="text-sm text-brand font-semibold">View all →</a></div>
+        {!txns ? <TableSkeleton/> : <TxnList rows={txns}/>}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Plans page ---------- */
+function Plans(){
+  const [modal,setModal]=useState(null);
+  const [done,setDone]=useState(false);
+  const subscribe=()=>{
+    // useful JS prompt: confirm before committing funds to a plan
+    var ok = window.confirm('Subscribe to ' + modal.name + '?\n\nPrice: ' + cedi0(modal.price) + '\nDaily income: ' + cedi0(modal.daily) + '\nDuration: ' + modal.days + ' days\nTotal return: ' + cedi0(modal.daily*modal.days));
+    if(!ok) return;
+    api.subscribePlan(modal).then(()=>{ setDone(true); window.alert('✅ Success! You are now subscribed to ' + modal.name + '. Your first daily income arrives tomorrow.'); });
+  };
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-xl font-extrabold text-navy-700 dark:text-white">Investment plans</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Choose a VIP plan and earn daily income for {PLANS[0].days} days.</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {PLANS.map(function(p){
+          return (
+            <div key={p.name}>
+              <PlanCardInteractive plan={p} onInvest={()=>{ setDone(false); setModal(p); }}/>
+            </div>
+          );
+        })}
+      </div>
+      <Card className="p-4 text-sm text-slate-500 dark:text-slate-400">
+        💡 Daily income is credited automatically each day for the validity period. Make sure your wallet is funded before investing.
+      </Card>
+      <Modal open={!!modal} onClose={()=>setModal(null)} title={done?'Subscribed!':('Confirm ' + (modal?modal.name:''))}>
+        {modal && !done && (
+          <div>
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between"><span className="text-slate-500">Plan</span><span className="font-bold">{modal.name}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Price</span><span className="font-bold">{cedi0(modal.price)}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Daily income</span><span className="font-bold text-profit">{cedi0(modal.daily)}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Total return</span><span className="font-bold">{cedi0(modal.daily*modal.days)}</span></div>
+            </div>
+            <div className="flex gap-2 mt-5"><Button variant="outline" className="flex-1" onClick={()=>setModal(null)}>Cancel</Button><Button className="flex-1" onClick={subscribe}>Confirm</Button></div>
+          </div>
+        )}
+        {done && (
+          <div className="text-center">
+            <div className="text-4xl">✅</div>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">You subscribed to <strong>{modal&&modal.name}</strong>. Daily income starts tomorrow.</p>
+            <Button className="mt-4" onClick={()=>{ setModal(null); go('/dashboard'); }}>Go to dashboard</Button>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+function PlanCardInteractive({ plan, onInvest }){
+  const head = plan.accent==='gold' ? 'from-amber-400 to-gold' : plan.accent==='navy' ? 'from-navy-700 to-navy-600' : 'from-brand to-brand-700';
+  return (
+    <div className="rounded-2xl bg-white dark:bg-navy-800 shadow-card border border-slate-100 dark:border-white/10 overflow-hidden flex flex-col animate-fadeUp">
+      <div className={cx('bg-gradient-to-br text-white px-4 pt-3 pb-4', head)}>
+        <div className="flex items-center justify-between"><span className="font-extrabold">{plan.name}</span>{plan.tag && <span className="text-[10px] font-bold uppercase bg-white/20 px-2 py-0.5 rounded-full">{plan.tag}</span>}</div>
+        <p className="text-2xl font-extrabold mt-1">{cedi0(plan.price)}</p>
+      </div>
+      <div className="p-4 flex-1 flex flex-col">
+        <div className="space-y-1.5 text-sm flex-1">
+          <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Daily</span><span className="font-bold text-profit">{cedi0(plan.daily)}</span></div>
+          <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Period</span><span className="font-semibold">{plan.days} days</span></div>
+          <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Total</span><span className="font-bold text-navy-700 dark:text-white">{cedi0(plan.daily*plan.days)}</span></div>
+        </div>
+        <Button size="sm" variant={plan.accent==='gold'?'gold':'primary'} className="mt-3 w-full" onClick={onInvest}>Invest now</Button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Deposit (amount selection) ---------- */
+function Deposit(){
+  const { depositAmount, setDepositAmount } = useApp();
+  const [custom,setCustom]=useState('');
+  const choose=(v)=>{ setDepositAmount(v); setCustom(''); };
+  const amount = custom ? Number(custom) : depositAmount;
+  // useful JS prompt: enter a custom amount with a native prompt + validation
+  const promptCustom=()=>{
+    var v = window.prompt('Enter a custom deposit amount (₵):', custom || '');
+    if(v===null) return;
+    var n = Number(v);
+    if(!n || n<=0){ window.alert('⚠️ Please enter a valid amount greater than 0.'); return; }
+    setCustom(String(n)); setDepositAmount(0);
+  };
+  const proceed=()=>{
+    // useful JS prompt: confirm the payment before continuing
+    if(!amount || amount<=0){ window.alert('⚠️ Please select or enter an amount first.'); return; }
+    var ok = window.confirm('Proceed to pay ' + cedi0(amount) + ' via Telecel Cash?');
+    if(!ok) return;
+    setDepositAmount(amount); go('/payment');
+  };
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-xl font-extrabold text-navy-700 dark:text-white">Deposit funds</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Select an amount to add to your wallet.</p>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        {DEPOSIT_AMOUNTS.map(function(v){
+          const active = !custom && depositAmount===v;
+          return (
+            <button key={v} onClick={()=>choose(v)} className={cx('rounded-2xl py-5 font-extrabold text-lg border-2 transition-all', active?'border-brand bg-brand/10 text-brand':'border-slate-200 dark:border-white/10 bg-white dark:bg-navy-800 text-navy-700 dark:text-white hover:border-brand/50')}>{cedi0(v)}</button>
+          );
+        })}
+      </div>
+      <Card className="p-4">
+        <label className="text-sm font-medium text-navy-700 dark:text-slate-200">Or enter a custom amount</label>
+        <div className="mt-1 relative">
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₵</span>
+          <input value={custom} onChange={(e)=>setCustom(e.target.value)} type="number" placeholder="0.00" className="w-full rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-navy-900 pl-8 pr-3 py-3 text-sm focus:ring-2 focus:ring-brand/40 focus:border-brand outline-none"/>
+        </div>
+        <button onClick={promptCustom} className="mt-2 text-sm font-semibold text-brand inline-flex items-center gap-1">✏️ Enter amount with keypad</button>
+      </Card>
+      <div className="rounded-2xl bg-navy-50 dark:bg-white/5 p-4 flex items-center justify-between">
+        <span className="text-sm text-slate-500 dark:text-slate-400">You will pay</span>
+        <span className="text-2xl font-extrabold text-navy-700 dark:text-white">{cedi0(amount||0)}</span>
+      </div>
+      <Button size="lg" disabled={!amount} onClick={proceed}>Pay Now!</Button>
+      <Card className="p-4">
+        <h4 className="font-bold text-sm text-navy-700 dark:text-white mb-2">How deposits work</h4>
+        <ol className="text-sm text-slate-500 dark:text-slate-400 space-y-1.5 list-decimal pl-4">
+          <li>Choose or enter the amount you want to deposit.</li>
+          <li>Tap <strong>Pay Now!</strong> to see the payment instructions.</li>
+          <li>Send the exact amount to the Telecel Cash number shown.</li>
+          <li>Your wallet is credited once payment is confirmed (usually instant).</li>
+        </ol>
+      </Card>
+    </div>
+  );
+}
+
+/* ---------- Payment instructions (with 5-min timer) ---------- */
+function Payment(){
+  const { depositAmount } = useApp();
+  const [left,setLeft]=useState(300); // 5 minutes
+  const [copied,setCopied]=useState(false);
+  const [paid,setPaid]=useState(false);
+  useEffect(function(){
+    const t = setInterval(function(){ setLeft(function(s){ return s>0 ? s-1 : 0; }); }, 1000);
+    return ()=> clearInterval(t);
+  }, []);
+  const mm = String(Math.floor(left/60)).padStart(2,'0');
+  const ss = String(left%60).padStart(2,'0');
+  const expired = left<=0;
+  const copyNum=()=>{ try{ navigator.clipboard.writeText(PAYEE.number); }catch(e){} setCopied(true); setTimeout(function(){ setCopied(false); }, 1500); };
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <button onClick={()=>go('/deposit')} className="flex items-center gap-1 text-sm text-slate-500"><Icon d="M15 18l-6-6 6-6" className="w-4 h-4"/> Back</button>
+        <span className={cx('font-mono font-extrabold text-sm px-3 py-1.5 rounded-full', expired?'bg-loss-soft text-loss':'bg-navy-700 text-white')}>⏱ {mm}:{ss}</span>
+      </div>
+      <div className="text-center">
+        <h2 className="text-lg font-extrabold text-navy-700 dark:text-white">Complete your payment</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Send the exact amount below to the receiver.</p>
+      </div>
+      <Card className="p-5 text-center">
+        <p className="text-xs uppercase tracking-wide text-slate-400">Amount to pay</p>
+        <p className="text-4xl font-extrabold text-navy-700 dark:text-white mt-1">{cedi0(depositAmount||0)}</p>
+      </Card>
+      <Card className="p-5 text-center">
+        <p className="text-xs uppercase tracking-wide text-slate-400">Receiver number</p>
+        <p className="text-3xl font-extrabold tracking-wider text-navy-700 dark:text-white mt-1">{PAYEE.number}</p>
+        <button onClick={copyNum} className="mt-2 text-sm font-semibold text-brand inline-flex items-center gap-1"><Icon d="M8 8h10v12H8zM6 16H4V4h12v2" className="w-4 h-4"/> {copied?'Copied!':'Copy number'}</button>
+        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-white/10">
+          <p className="text-xs uppercase tracking-wide text-slate-400">Receiver name</p>
+          <p className="text-xl font-extrabold text-navy-700 dark:text-white mt-0.5">{PAYEE.name}</p>
+          <div className="mt-2"><Badge tone="gold">{PAYEE.note}</Badge></div>
+        </div>
+      </Card>
+      <Card className="p-4">
+        <h4 className="font-bold text-sm text-navy-700 dark:text-white mb-2">Payment instructions</h4>
+        <ol className="text-sm text-slate-500 dark:text-slate-400 space-y-1.5 list-decimal pl-4">
+          <li>Dial your Telecel Cash menu or open the app.</li>
+          <li>Choose <strong>Send Money</strong> and enter <strong>{PAYEE.number}</strong>.</li>
+          <li>Enter the exact amount <strong>{cedi0(depositAmount||0)}</strong>.</li>
+          <li>Confirm the receiver name is <strong>{PAYEE.name}</strong>, then approve with your PIN.</li>
+          <li>Tap <strong>I have paid</strong> below once done.</li>
+        </ol>
+        <p className="text-xs text-loss mt-3">⚠️ Complete payment before the timer runs out, or restart the deposit.</p>
+      </Card>
+      <Button size="lg" variant="success" disabled={expired} onClick={()=>setPaid(true)}>{expired?'Time expired — restart':'I have paid'}</Button>
+      <Modal open={paid} onClose={()=>setPaid(false)} title="Payment submitted">
+        <div className="text-center">
+          <div className="text-4xl">✅</div>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">We're confirming your payment of <strong>{cedi0(depositAmount||0)}</strong>. Your wallet will be credited shortly.</p>
+          <Button className="mt-4" onClick={()=>{ setPaid(false); go('/dashboard'); }}>Done</Button>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+/* ---------- Withdraw ---------- */
+function Withdraw(){
+  const [acct,setAcct]=useState('');
+  const [num,setNum]=useState('');
+  const [amt,setAmt]=useState('');
+  const [modal,setModal]=useState(false);
+  const submit=(e)=>{
+    e.preventDefault();
+    var n = Number(amt);
+    // useful JS prompt: validate against balance, then confirm
+    if(!n || n<=0){ window.alert('⚠️ Enter a valid withdrawal amount.'); return; }
+    if(n > MOCK.available){ window.alert('⚠️ Amount exceeds your available balance of ' + cedi(MOCK.available) + '.'); return; }
+    var ok = window.confirm('Withdraw ' + cedi(n) + ' to ' + (acct||'your account') + ' (' + (num||'—') + ')?');
+    if(!ok) return;
+    setModal(true);
+  };
+  return (
+    <div className="space-y-4">
+      {/* balance on top */}
+      <div className="rounded-3xl bg-gradient-to-br from-navy-700 to-brand text-white p-5 shadow-pop">
+        <p className="text-sm text-slate-200">Available balance</p>
+        <p className="text-3xl font-extrabold mt-1">{cedi(MOCK.available)}</p>
+        <p className="text-xs text-slate-300 mt-1">Withdrawable now</p>
+      </div>
+      <h2 className="text-xl font-extrabold text-navy-700 dark:text-white">Withdraw funds</h2>
+      <Card className="p-5">
+        <form onSubmit={submit} className="space-y-4">
+          <Field label="Withdrawal account" placeholder="Account name (e.g. Emma Highest)" value={acct} onChange={(e)=>setAcct(e.target.value)}/>
+          <Field label="Withdrawal number" type="tel" placeholder="e.g. 0541234567" value={num} onChange={(e)=>setNum(e.target.value)}/>
+          <label className="block">
+            <span className="text-sm font-medium text-navy-700 dark:text-slate-200">Amount</span>
+            <div className="mt-1 relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₵</span>
+              <input value={amt} onChange={(e)=>setAmt(e.target.value)} type="number" placeholder="0.00" className="w-full rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-navy-900 pl-8 pr-3 py-3 text-sm focus:ring-2 focus:ring-brand/40 focus:border-brand outline-none"/>
+            </div>
+          </label>
+          <Button size="lg" variant="danger" disabled={!acct||!num||!amt}>Request withdrawal</Button>
+        </form>
+      </Card>
+      <Card className="p-4">
+        <h4 className="font-bold text-sm text-navy-700 dark:text-white mb-2">Withdrawal instructions</h4>
+        <ol className="text-sm text-slate-500 dark:text-slate-400 space-y-1.5 list-decimal pl-4">
+          <li>Enter the account name and mobile money number to receive funds.</li>
+          <li>Enter the amount (must not exceed your available balance).</li>
+          <li>Withdrawals are reviewed and processed within 24 hours.</li>
+          <li>Double-check your number — funds sent to a wrong number cannot be recovered.</li>
+        </ol>
+      </Card>
+      <Modal open={modal} onClose={()=>setModal(false)} title="Confirm withdrawal">
+        <div className="space-y-1.5 text-sm">
+          <div className="flex justify-between"><span className="text-slate-500">Account</span><span className="font-bold">{acct||'—'}</span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Number</span><span className="font-bold">{num||'—'}</span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Amount</span><span className="font-bold">{amt?cedi(Number(amt)):'₵0.00'}</span></div>
+        </div>
+        <p className="text-xs text-slate-400 mt-3">This is a demo — no real funds will move.</p>
+        <div className="flex gap-2 mt-5"><Button variant="outline" className="flex-1" onClick={()=>setModal(false)}>Cancel</Button><Button variant="danger" className="flex-1" onClick={()=>{ setModal(false); go('/dashboard'); }}>Confirm</Button></div>
+      </Modal>
+    </div>
+  );
+}
+
+/* ---------- Transactions ---------- */
+function TxnList({ rows }){
+  const tone = (t)=> (t==='Deposit'||t==='Income')?'profit':t==='Withdrawal'?'loss':'brand';
+  const stone = (s)=> s==='Completed'?'profit':s==='Pending'?'amber':'loss';
+  const sign = (t)=> (t==='Withdrawal'||t==='Investment')?'-':'+';
+  return (
+    <div className="space-y-2">
+      {rows.map(function(t){
+        return (
+          <Card key={t.id} className="p-3.5 flex items-center gap-3">
+            <span className={cx('w-9 h-9 rounded-xl grid place-items-center', tone(t)==='profit'?'bg-profit-soft text-profit':tone(t)==='loss'?'bg-loss-soft text-loss':'bg-blue-50 text-brand')}>
+              <Icon d={t.type==='Withdrawal'?'M12 19V5M5 12l7-7 7 7':t.type==='Deposit'||t.type==='Income'?'M12 5v14M19 12l-7 7-7-7':'M4 7h16M4 12h16M4 17h10'} className="w-4 h-4"/>
+            </span>
+            <div className="flex-1"><p className="font-semibold text-sm">{t.type}</p><p className="text-xs text-slate-400">{t.date} · {t.id}</p></div>
+            <div className="text-right"><p className={cx('font-bold text-sm', tone(t)==='loss'?'text-loss':'text-navy-700 dark:text-white')}>{sign(t)}{cedi0(t.amount)}</p><Badge tone={stone(t.status)}>{t.status}</Badge></div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+function Transactions(){
+  const [rows,setRows]=useState(null); const [filter,setFilter]=useState('All');
+  useEffect(function(){ api.getTransactions().then(setRows); }, []);
+  const types=['All','Deposit','Withdrawal','Income','Investment'];
+  const shown = rows ? (filter==='All'?rows:rows.filter(function(r){ return r.type===filter; })) : null;
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-extrabold text-navy-700 dark:text-white">Transactions</h2>
+      <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1">
+        {types.map(function(t){
+          return <button key={t} onClick={()=>setFilter(t)} className={cx('shrink-0 text-xs font-semibold px-3.5 py-2 rounded-full transition-colors', filter===t?'bg-brand text-white':'bg-white dark:bg-navy-800 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300')}>{t}</button>;
+        })}
+      </div>
+      {!shown ? <TableSkeleton rows={6}/> : (shown.length ? <TxnList rows={shown}/> : <p className="text-center text-slate-400 py-10 text-sm">No {filter} transactions.</p>)}
+    </div>
+  );
+}
+
+/* ---------- Account (profile + settings + links) ---------- */
+function Account(){
+  const { dark, setDark, setAuthed } = useApp();
+  const links = [
+    ['Transactions','M4 7h16M4 12h16M4 17h10','/transactions'],
+    ['Investment plans','M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z','/plans'],
+    ['Deposit funds','M12 5v14M5 12h14','/deposit'],
+    ['Withdraw funds','M12 19V5M5 12l7-7 7 7','/withdraw']
+  ];
+  return (
+    <div className="space-y-4">
+      <Card className="p-5 flex items-center gap-4">
+        <div className="w-16 h-16 rounded-full bg-brand text-white grid place-items-center text-xl font-bold">{MOCK.user.avatar}</div>
+        <div className="flex-1"><h3 className="font-bold text-lg text-navy-700 dark:text-white">{MOCK.user.name}</h3><p className="text-sm text-slate-400">{MOCK.user.phone}</p><div className="mt-1"><Badge tone="brand">{MOCK.user.tier} member</Badge></div></div>
+      </Card>
+      <Card className="p-2">
+        {links.map(function(l){
+          return (
+            <a key={l[0]} href={'#'+l[2]} className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5">
+              <span className="w-9 h-9 rounded-xl bg-navy-50 dark:bg-white/10 grid place-items-center text-navy-700 dark:text-white"><Icon d={l[1]} className="w-4 h-4"/></span>
+              <span className="flex-1 font-semibold text-sm">{l[0]}</span>
+              <Icon d="M9 6l6 6-6 6" className="w-4 h-4 text-slate-400"/>
+            </a>
+          );
+        })}
+      </Card>
+      <Card className="p-4">
+        <h4 className="font-bold text-navy-700 dark:text-white mb-3 text-sm">Preferences</h4>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between"><div><p className="font-semibold text-sm">Dark mode</p><p className="text-xs text-slate-400">Switch theme</p></div><Toggle on={dark} onClick={()=>setDark(!dark)}/></div>
+          <div className="flex items-center justify-between"><div><p className="font-semibold text-sm">Two-factor auth</p><p className="text-xs text-slate-400">Extra security</p></div><Toggle on={true}/></div>
+          <div className="flex items-center justify-between"><div><p className="font-semibold text-sm">Email alerts</p><p className="text-xs text-slate-400">Trade confirmations</p></div><Toggle on={true}/></div>
+        </div>
+      </Card>
+      <Button variant="outline" onClick={()=>{ if(window.confirm('Sign out of Swift Investments?')){ setAuthed(false); go('/'); } }}>Sign out</Button>
+    </div>
+  );
+}
+
+/* =========================================================================
+   ROUTES MAP   >>> REGISTER A NEW PAGE HERE <<<
+   isPublic:true => standalone; otherwise wrapped in <AppShell/>.
+========================================================================= */
+const ROUTES = {
+  '/':             { comp:Landing,      isPublic:true },
+  '/login':        { comp:Login,        isPublic:true },
+  '/register':     { comp:Register,     isPublic:true },
+  '/dashboard':    { comp:Dashboard,    title:'Home' },
+  '/plans':        { comp:Plans,        title:'Plans' },
+  '/deposit':      { comp:Deposit,      title:'Deposit' },
+  '/payment':      { comp:Payment,      title:'Payment' },
+  '/withdraw':     { comp:Withdraw,     title:'Withdraw' },
+  '/transactions': { comp:Transactions, title:'Transactions' },
+  '/account':      { comp:Account,      title:'Account' }
+  // '/reports':   { comp:Reports, title:'Reports' },  // <-- add future pages here
+};
+function Router(){
+  const route = useHashRoute();
+  const key = Object.keys(ROUTES).find(function(k){ return k!=='/' && route.startsWith(k); }) || (route==='/'?'/':null);
+  const match = key ? ROUTES[key] : null;
+  if(!match){
+    return <div className="max-w-md mx-auto min-h-screen grid place-items-center text-center p-6"><div><p className="text-6xl font-extrabold text-navy-200">404</p><p className="mt-2 text-slate-500">Page not found.</p><Button className="mt-4 w-auto px-6" onClick={()=>go('/dashboard')}>Go home</Button></div></div>;
+  }
+  const Comp = match.comp;
+  if(match.isPublic) return <Comp/>;
+  return <AppShell route={route} title={match.title}><Comp/></AppShell>;
+}
+function App(){ return <AppProvider><Router/></AppProvider>; }
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "swift-investments-backend",
+  "version": "1.0.0",
+  "description": "Zero-dependency backend (Node http + sqlite + crypto) for Swift Investments.",
+  "private": true,
+  "type": "commonjs",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node --no-warnings server.js",
+    "dev": "node --no-warnings --watch server.js"
+  }
+}

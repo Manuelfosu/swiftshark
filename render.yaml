@@ -1,0 +1,28 @@
+# =============================================================================
+# RENDER BLUEPRINT — host the WHOLE app (front-end + API + database) as ONE
+# web service on ONE URL. See DEPLOY-ALL-IN-ONE.md for click-by-click steps.
+# =============================================================================
+services:
+  - type: web
+    name: swift-investments
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: "echo no build step needed"
+    startCommand: "node --no-warnings server.js"
+    envVars:
+      - key: NODE_VERSION
+        value: "22.12.0"
+
+    # -------------------------------------------------------------------------
+    # OPTIONAL — make the database PERMANENT (survives restarts & redeploys).
+    # Render persistent disks require a paid instance type. To enable:
+    #   1. change "plan: free" above to "plan: starter"
+    #   2. uncomment the disk block below
+    #   3. uncomment the DB_FILE env var below
+    # disk:
+    #   name: swift-data
+    #   mountPath: /data
+    #   sizeGB: 1
+    #   - key: DB_FILE
+    #     value: /data/swift.db
